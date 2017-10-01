@@ -36,15 +36,19 @@ public Plugin myinfo =
 
 public void OnPluginStart()
 {
+	// Check game support, exit if invalid
 	g_Game = GetEngineVersion();
 	if(!(g_Game == Engine_CSGO || g_Game == Engine_CSS))
 	{
 		SetFailState("This plugin is for CSGO/CSS only.");	
 	}
 	
+	// Hook callbacks to game events
 	HookEvent("player_death", player_death);
 	HookEvent("round_poststart", round_start);
 	//HookEvent("player_say", player_say, EventHookMode_Pre);
+	
+	// Hook callbacks for commands (
 	AddCommandListener(player_say, "say");
 	AddCommandListener(player_say, "say_team");
 	
@@ -60,6 +64,7 @@ public void OnPluginStart()
 	
 }
 
+// Check if client is muted (text)
 stock bool:isMuted(client)
 {
 	if(BaseComm_IsClientMuted(client))
@@ -67,6 +72,7 @@ stock bool:isMuted(client)
 	return false;
 }
 
+// Check if client is gagged (voice)
 stock bool:isGagged(client)
 {
 	if(BaseComm_IsClientGagged(client))
@@ -74,6 +80,7 @@ stock bool:isGagged(client)
 	return false;
 }
 
+// Generate a plugin message, maximum length 126-prefix length characters
 stock char[] genPlugMessage(char[] message)
 {
 	char newmessage[126];
@@ -81,17 +88,20 @@ stock char[] genPlugMessage(char[] message)
 	return newmessage;
 }
 
+
 public Action:deadtalk_toggle(int client, int args)
 {
 	//muting_enabled = !(muting_enabled);
 	// TODO: This
 }
 
+// When the round starts
 public Action:round_start(Event event, const String:name[], bool dontBroadcast)
 {
+	// Unmute CTs at the beginning of the round
 	for (new i = 1; i <= MaxClients; i++)
 	{
-		if(IsClientInGame(i) && (!IsFakeClient(i)) && IsPlayerAlive(i) && (GetClientTeam(i)==3))
+		if(IsClientInGame(i) && (!IsFakeClient(i)) && IsPlayerAlive(i) && (GetClientTeam(i)==3)) // Limit to in-game non-bot alive CTs
 		{
 			BaseComm_SetClientGag(i, false);
 			BaseComm_SetClientMute(i, false);
@@ -102,28 +112,31 @@ public Action:round_start(Event event, const String:name[], bool dontBroadcast)
 	return Plugin_Continue;
 }
 
+// When someone sends a chat message
 public Action:player_say(int client, const String:command[], int argc)
 {
-	if(IsClientInGame(client) && (!IsFakeClient(client)) && (!IsPlayerAlive(client)))
+	// Process dead chats properly
+	if(IsClientInGame(client) && (!IsFakeClient(client)) && (!IsPlayerAlive(client))) // Limit processing to in-game non-bot dead players
 	{
 		char message[126];
-		if(GetCmdArg(1, message, sizeof(message)) < 1)
+		if(GetCmdArg(1, message, sizeof(message)) < 1) // Get message; don't touch zero-length messages
 			return Plugin_Continue;
-		if(message[0] == '@' || message[0] == '/')
+		if(message[0] == '@' || message[0] == '/') // Filter out command messages (TODO make this configurable)
 			return Plugin_Handled;
 		char[] mname = new char[MAX_NAME_LENGTH];
-		GetClientName(client, mname, MAX_NAME_LENGTH);
+		GetClientName(client, mname, MAX_NAME_LENGTH); // Get client name
 		//char[] colors = "\x01\x0B\x02";
-		for (new i = 1; i < MaxClients; i++)
+		for (new i = 1; i < MaxClients; i++) // Iterate over all clients
 		{
+			// Relay message to in-game non-bot players IF they are dead or have the "r" flag (includes "z" flag admins too)
 			if(IsClientInGame(i) && (!IsFakeClient(client)) && ((!IsPlayerAlive(i)) || GetAdminFlag(GetUserAdmin(i), Admin_Custom4, Access_Real)))
 			{
-				PrintToChat(i, "\x03 \x02*DEAD* %s: \x01%s", mname, message);
+				PrintToChat(i, "\x03 \x02*DEAD* %s: \x01%s", mname, message); // Relay the dead player's message to this client
 			}
 		}
-		return Plugin_Handled;
+		return Plugin_Handled; // Don't do anything else with the message
 	}
-	else
+	else // Bypass all other messages
 	{
 		return Plugin_Continue;
 	}
@@ -134,6 +147,7 @@ public Action:player_death(Event event, const String:name[], bool:dontBroadcast)
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 	
 	// && GetAdminFlags(GetUserAdmin(client), Access_Real)
+	
 	
 	if(!(GetUserAdmin(client) == INVALID_ADMIN_ID) && GetAdminFlag(GetUserAdmin(client), Admin_Custom4, Access_Real))
 	{
