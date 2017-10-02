@@ -129,6 +129,8 @@ public Action:deadtalk_toggle(int client, int args)
 // When the round starts
 public Action:round_start(Event event, const String:name[], bool dontBroadcast)
 {
+	ConVar alltalk = FindConVar("sv_full_alltalk");
+	SetConVarInt(alltalk, 1);
 	// For all clients
 	for (new i = 1; i <= MaxClients; i++)
 	{
@@ -170,13 +172,13 @@ public Action:round_start(Event event, const String:name[], bool dontBroadcast)
 
 public Action:round_end(Event event, const String:name[], bool dontBroadcast)
 {
+	PrintToChatAll(genPlugMessage("Round over! Everyone unmuted."));
 	if(terroristMute)
 	{
 		KillTimer(terroristTimer);
 		terroristMute = false;
 	}
 	unmuteAll();
-	PrintToChatAll(genPlugMessage("Round over! Everyone unmuted."));
 	return Plugin_Continue;
 }
 
