@@ -19,6 +19,8 @@ char MESSAGE_PREFIX[] = "\x03[JM] \x04";
 // CVARS go here
 
 // Other
+Handle terroristTimer;
+terroristMute = false;
 
 EngineVersion g_Game;
 
@@ -95,6 +97,20 @@ public Action:unmuteT(Handle timer)
 	PrintToChatAll(genPlugMessage("All T's have been unmuted."));
 }
 
+stock unmuteAll()
+{
+	for (new i = 1; i <= MaxClients; i++)
+	{
+		if(IsClientInGame(i) && !IsFakeClient(i))
+		{
+			BaseComm_SetClientGag(i, true);
+			BaseComm_SetClientMute(i, true);
+			BaseComm_SetClientGag(i, false);
+			BaseComm_SetClientMute(i, false);
+		}
+	}
+}
+
 // Generate a plugin message, maximum length 126-prefix length characters
 stock char[] genPlugMessage(char[] message)
 {
@@ -147,8 +163,20 @@ public Action:round_start(Event event, const String:name[], bool dontBroadcast)
 	}
 	
 	PrintToChatAll(genPlugMessage("All T's have been muted for 30 seconds."));
-	CreateTimer(30.0, unmuteT);
+	terroristMute = true;
+	terroristTimer = CreateTimer(30.0, unmuteT);
 	return Plugin_Continue;
+}
+
+public Action:round_end(Event event, const String:name[], bool dontBroadcast)
+{
+	if(terroristMute)
+	{
+		KillTimer(terroristTimer);
+		terroristMute = false;
+	}
+	unmuteAll();
+	PrintToChatAll("Round over! Everyone unmuted.");
 }
 
 // When someone sends a chat message
@@ -190,6 +218,8 @@ public Action:player_death(Event event, const String:name[], bool:dontBroadcast)
 	
 	if(!(GetUserAdmin(client) == INVALID_ADMIN_ID) && GetAdminFlag(GetUserAdmin(client), Admin_Custom4, Access_Real))
 	{
+		BaseComm_SetClientGag(client, true);
+		BaseComm_SetClientMute(client, true);
 		BaseComm_SetClientGag(client, false);
 		BaseComm_SetClientMute(client, false);
 		PrintToChat(client, genPlugMessage("As you are an admin, you have not been muted on death."));
