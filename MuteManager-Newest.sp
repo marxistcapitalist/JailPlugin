@@ -177,6 +177,7 @@ public Action:round_end(Event event, const String:name[], bool dontBroadcast)
 	}
 	unmuteAll();
 	PrintToChatAll("Round over! Everyone unmuted.");
+	return Plugin_Continue;
 }
 
 // When someone sends a chat message
