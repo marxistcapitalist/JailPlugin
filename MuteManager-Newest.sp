@@ -18,6 +18,8 @@ char MESSAGE_PREFIX[] = "\x03[JM] \x04";
 
 // CVARS go here
 
+// Other
+
 EngineVersion g_Game;
 
 public Plugin myinfo = 
@@ -64,20 +66,33 @@ public void OnPluginStart()
 	
 }
 
-// Check if client is muted (text)
-stock bool:isMuted(client)
+// Check if client is muted (voice)
+stock bool isMuted(client)
 {
 	if(BaseComm_IsClientMuted(client))
 		return true;
 	return false;
 }
 
-// Check if client is gagged (voice)
-stock bool:isGagged(client)
+// Check if client is gagged (text)
+stock bool isGagged(client)
 {
 	if(BaseComm_IsClientGagged(client))
 		return true;
 	return false;
+}
+
+public Action:unmuteT(Handle timer) 
+{
+	for (new i = 1; i <= MaxClients; i++)
+	{
+		if(IsClientInGame(i) && !IsFakeClient(i) && IsPlayerAlive(i) && GetClientTeam(i)==CS_TEAM_T)
+		{
+			BaseComm_SetClientGag(i, false);
+			BaseComm_SetClientMute(i, false);
+		}
+	}
+	PrintToChatAll(genPlugMessage("All T's have been unmuted."));
 }
 
 // Generate a plugin message, maximum length 126-prefix length characters
@@ -98,17 +113,41 @@ public Action:deadtalk_toggle(int client, int args)
 // When the round starts
 public Action:round_start(Event event, const String:name[], bool dontBroadcast)
 {
-	// Unmute CTs at the beginning of the round
+	// For all clients
 	for (new i = 1; i <= MaxClients; i++)
 	{
-		if(IsClientInGame(i) && (!IsFakeClient(i)) && IsPlayerAlive(i) && (GetClientTeam(i)==3)) // Limit to in-game non-bot alive CTs
-		{
-			BaseComm_SetClientGag(i, false);
-			BaseComm_SetClientMute(i, false);
-			PrintToChat(i, genPlugMessage("As you are a CT, you have been unmuted."));
+		if(IsClientInGame(i) && !IsFakeClient(i)) { // Only deal with in-game non-bot non-console clients
+			if(!(GetUserAdmin(i) == INVALID_ADMIN_ID) && GetAdminFlag(GetUserAdmin(i), Admin_Custom4, Access_Real)) // If admin with R or Z flag
+			{
+				BaseComm_SetClientGag(i, false);
+				BaseComm_SetClientMute(i, false);
+				PrintToChat(i, genPlugMessage("As you are an admin, you have not been muted."));
+				continue; // Skip the rest of this iteration, since we don't want the admin handled anymore
+			}
+			
+			if(IsPlayerAlive(i) && GetClientTeam(i)==CS_TEAM_CT) // If player is alive and on CT
+			{
+				BaseComm_SetClientGag(i, false);
+				BaseComm_SetClientMute(i, false);
+				PrintToChat(i, genPlugMessage("As you are a CT, you have not been muted."));
+			}
+			else if(IsPlayerAlive(i) && GetClientTeam(i)==CS_TEAM_T) // Is player is alive and on T
+			{
+				BaseComm_SetClientGag(i, false);
+				BaseComm_SetClientMute(i, true);
+				PrintToChat(i, genPlugMessage("As you are a T, you have been muted, but not gagged."));
+			}
+			else
+			{
+				BaseComm_SetClientGag(i, true);
+				BaseComm_SetClientMute(i, true);
+				PrintToChat(i, genPlugMessage("As you are either dead or a spectator, you have been silenced."));
+			}
 		}
 	}
 	
+	PrintToChatAll(genPlugMessage("All T's have been muted for 30 seconds."));
+	CreateTimer(30.0, unmuteT);
 	return Plugin_Continue;
 }
 
@@ -118,18 +157,18 @@ public Action:player_say(int client, const String:command[], int argc)
 	// Process dead chats properly
 	if(IsClientInGame(client) && (!IsFakeClient(client)) && (!IsPlayerAlive(client))) // Limit processing to in-game non-bot dead players
 	{
-		char message[126];
+		char message[126]; // Messages are maxed at 126 characters
 		if(GetCmdArg(1, message, sizeof(message)) < 1) // Get message; don't touch zero-length messages
 			return Plugin_Continue;
-		if(message[0] == '@' || message[0] == '/') // Filter out command messages (TODO make this configurable)
-			return Plugin_Handled;
+		if(message[0] == '@' || message[0] == '/') // Filter out messages with command or privmsg prefixes (TODO make this configurable)
+			return Plugin_Continue; // Let other plugins take the command or privmsg
 		char[] mname = new char[MAX_NAME_LENGTH];
 		GetClientName(client, mname, MAX_NAME_LENGTH); // Get client name
 		//char[] colors = "\x01\x0B\x02";
 		for (new i = 1; i < MaxClients; i++) // Iterate over all clients
 		{
 			// Relay message to in-game non-bot players IF they are dead or have the "r" flag (includes "z" flag admins too)
-			if(IsClientInGame(i) && (!IsFakeClient(client)) && ((!IsPlayerAlive(i)) || GetAdminFlag(GetUserAdmin(i), Admin_Custom4, Access_Real)))
+			if(IsClientInGame(i) && !IsFakeClient(client) && (!IsPlayerAlive(i) || GetAdminFlag(GetUserAdmin(i), Admin_Custom4, Access_Real)))
 			{
 				PrintToChat(i, "\x03 \x02*DEAD* %s: \x01%s", mname, message); // Relay the dead player's message to this client
 			}
@@ -153,13 +192,13 @@ public Action:player_death(Event event, const String:name[], bool:dontBroadcast)
 	{
 		BaseComm_SetClientGag(client, false);
 		BaseComm_SetClientMute(client, false);
-		PrintToChat(client, "[JM] As you are an admin, you have not been muted on death.");
+		PrintToChat(client, genPlugMessage("As you are an admin, you have not been muted on death."));
 	}
 	else
 	{
 		BaseComm_SetClientGag(client, false);
 		BaseComm_SetClientMute(client, true);
-		PrintToChat(client, "[JM] You have died, and therefore have been voice muted. You may only text chat with dead players.");
+		PrintToChat(client, genPlugMessage("You have died, and therefore have been voice muted. You may only text chat with dead players."));
 	}
 	
 	return Plugin_Continue;
