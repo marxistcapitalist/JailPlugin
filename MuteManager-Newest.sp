@@ -176,7 +176,7 @@ public Action:round_end(Event event, const String:name[], bool dontBroadcast)
 		terroristMute = false;
 	}
 	unmuteAll();
-	PrintToChatAll(genPluginMsg("Round over! Everyone unmuted."));
+	PrintToChatAll(genPlugMessage("Round over! Everyone unmuted."));
 	return Plugin_Continue;
 }
 
